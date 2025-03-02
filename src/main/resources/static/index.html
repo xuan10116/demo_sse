@@ -126,11 +126,25 @@
 
             // 监听消息事件
             eventSource.onmessage = (event) => {
-                const message = event.data;
-                const outputElement = document.getElementById(`${clientId}-content`);
-                if (outputElement) {
-                    const currentContent = outputElement.textContent;
-                    outputElement.textContent = currentContent + message; // 删除换行符，直接追加字符
+                try {
+                    // 解析 JSON 数据
+                    const jsonData = JSON.parse(event.data);
+                    const content = jsonData.choices[0].delta.content;
+
+                    // 新增：跳过 content 为空的数据
+                    if (!content) {
+                        console.log('Skipping empty content data:', event.data);
+                        return;
+                    }
+
+                    // 更新页面内容
+                    const outputElement = document.getElementById(`${clientId}-content`);
+                    if (outputElement) {
+                        const currentContent = outputElement.textContent;
+                        outputElement.textContent = currentContent + content; // 追加解析后的内容
+                    }
+                } catch (error) {
+                    console.error('Failed to parse JSON data:', error);
                 }
             };
 

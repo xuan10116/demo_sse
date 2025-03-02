@@ -34,15 +34,16 @@ public class ChatStreamController {
         String fileContent = readFileContent("static/twgx.txt");
 
         return Flux.fromIterable(fileContent.chars()
-                    .mapToObj(c -> String.valueOf((char) c))
-                    .toList())
-            .delayElements(Duration.ofMillis(100))
-            .filter(sequence -> {
-                if (!clientPausedMap.containsKey(clientId)) { // 检查客户端是否已终止
-                    throw new RuntimeException("Client stream terminated: " + clientId);
-                }
-                return !getClientStatus(clientId);
-            });
+                .mapToObj(c -> processCharacter(c)) // 调用提取的处理方法
+                .filter(json -> json != null) // 过滤掉无效的 JSON 数据
+                .toList())
+        .delayElements(Duration.ofMillis(100))
+        .filter(sequence -> {
+            if (!clientPausedMap.containsKey(clientId)) { // 检查客户端是否已终止
+                throw new RuntimeException("Client stream terminated: " + clientId);
+            }
+            return !getClientStatus(clientId);
+        });
     }
 
     @GetMapping("/chat/pause")
@@ -65,6 +66,24 @@ public class ChatStreamController {
                   .append(", Status: ").append(paused.get() ? "Paused" : "Active")
                   .append("\n"));
         return status.toString();
+    }
+
+    // 提取的字符处理方法
+    private String processCharacter(int c) {
+        try {
+            // 校验字符是否为空白字符
+            char character = (char) c;
+            if (Character.isWhitespace(character)) {
+                return null; // 跳过空白字符
+            }
+            // 构造 JSON 格式的字符串
+            String content = String.valueOf(character);
+            return "{\"choices\": [{\"delta\": {\"role\": \"assistant\", \"content\": \"" + content + "\"}}]}";
+        } catch (Exception e) {
+            // 捕获异常并记录日志
+            System.err.println("Error processing character: " + c + ", error: " + e.getMessage());
+            return null; // 跳过异常数据
+        }
     }
 
     // 提取公共方法：获取客户状态
