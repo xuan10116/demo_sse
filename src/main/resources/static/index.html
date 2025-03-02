@@ -20,17 +20,19 @@
 
     <!-- 修改：为每个操作添加独立的输出窗口 -->
     <div style="display: flex; gap: 20px;">
-        <div id="output-client1" style="border: 1px solid #ccc; padding: 10px; flex: 1;">
+        <div id="output-client1" style="border: 1px solid #ccc; padding: 10px; flex: 1; width: 300px; overflow-x: auto;">
             <h3>Client 1 Output</h3>
-            <pre id="client1-content">Client 1 status will be displayed here dynamically.</pre>
+            <pre id="client1-content" style="white-space: pre-wrap; word-wrap: break-word;">Output:</pre>
+            <div id="client1-status" style="margin-top: 10px;">Client 1 status updates will appear here.</div>
         </div>
-        <div id="output-client2" style="border: 1px solid #ccc; padding: 10px; flex: 1;">
+        <div id="output-client2" style="border: 1px solid #ccc; padding: 10px; flex: 1; width: 300px; overflow-x: auto;">
             <h3>Client 2 Output</h3>
-            <pre id="client2-content">Client 2 status will be displayed here dynamically.</pre>
+            <pre id="client2-content" style="white-space: pre-wrap; word-wrap: break-word;">Output:</pre>
+            <div id="client2-status" style="margin-top: 10px;">Client 2 status updates will appear here.</div>
         </div>
-        <div id="output-all-clients" style="border: 1px solid #ccc; padding: 10px; flex: 1;">
+        <div id="output-all-clients" style="border: 1px solid #ccc; padding: 10px; flex: 1; width: 300px; overflow-x: auto;">
             <h3>All Clients Status</h3>
-            <pre id="all-clients-content">All clients status will be displayed here dynamically.</pre>
+            <pre id="all-clients-content" style="white-space: pre-wrap; word-wrap: break-word;">All clients status will be displayed here dynamically.</pre>
         </div>
     </div>
 
@@ -41,8 +43,8 @@
         // 获取所有的动态链接并添加点击事件监听器
         document.querySelectorAll('.dynamic-link').forEach(link => {
             link.addEventListener('click', async (event) => {
-                event.preventDefault(); // 阻止默认跳转行为
-                const url = link.getAttribute('href'); // 获取链接的目标地址
+                event.preventDefault();
+                const url = link.getAttribute('href');
 
                 if (url.startsWith('/chat/stream')) {
                     const clientId = new URLSearchParams(new URL(url, window.location.origin).search).get('clientId');
@@ -60,6 +62,7 @@
                         document.getElementById('all-clients-content').textContent = 'Failed to load content.';
                     }
                 } else {
+                    // 修改：将 Pause/Resume 的结果输出到独立区域
                     try {
                         const response = await fetch(url);
                         if (!response.ok) {
@@ -67,16 +70,16 @@
                         }
                         const data = await response.text();
                         const clientId = new URLSearchParams(new URL(url, window.location.origin).search).get('clientId');
-                        const outputElement = document.getElementById(`${clientId}-content`);
-                        if (outputElement) {
-                            outputElement.textContent = data;
+                        const statusElement = document.getElementById(`${clientId}-status`);
+                        if (statusElement) {
+                            statusElement.textContent = data; // 将状态更新显示在独立区域
                         }
                     } catch (error) {
                         console.error('Error fetching data:', error);
                         const clientId = new URLSearchParams(new URL(url, window.location.origin).search).get('clientId');
-                        const outputElement = document.getElementById(`${clientId}-content`);
-                        if (outputElement) {
-                            outputElement.textContent = 'Failed to load content.';
+                        const statusElement = document.getElementById(`${clientId}-status`);
+                        if (statusElement) {
+                            statusElement.textContent = 'Failed to update status.';
                         }
                     }
                 }
@@ -99,7 +102,7 @@
                 const outputElement = document.getElementById(`${clientId}-content`);
                 if (outputElement) {
                     const currentContent = outputElement.textContent;
-                    outputElement.textContent = `${currentContent}\n${message}`;
+                    outputElement.textContent = currentContent + message; // 删除换行符，直接追加字符
                 }
             };
 

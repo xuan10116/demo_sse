@@ -21,9 +21,15 @@ public class ChatStreamController {
 
     @GetMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<String> flux(@RequestParam String clientId) {
-        return Flux.interval(Duration.ofSeconds(1))
-                   .filter(sequence -> !getClientStatus(clientId)) // 调用提取的公共方法
-                   .map(sequence -> "Chat Message - " + sequence);
+        // 读取固定文件内容
+        String fileContent = readFileContent("static/twgx.txt"); // 假设文件路径为 static/sample.txt
+
+        // 将文件内容逐字拆分为字符流，并转换为 List 以符合 Iterable 接口要求
+        return Flux.fromIterable(fileContent.chars()
+                        .mapToObj(c -> String.valueOf((char) c))
+                        .toList()) // 将 Stream 转换为 List
+                .delayElements(Duration.ofMillis(100)) // 模拟逐字返回
+                .filter(sequence -> !getClientStatus(clientId)); // 调用提取的公共方法
     }
 
     @GetMapping("/chat/pause")
@@ -56,5 +62,15 @@ public class ChatStreamController {
     // 提取公共方法：更新客户状态
     private void updateClientStatus(String clientId, boolean isPaused) {
         clientPausedMap.put(clientId, new AtomicBoolean(isPaused));
+    }
+
+    // 新增方法：读取文件内容
+    private String readFileContent(String filePath) {
+        try {
+            // 使用类加载器读取资源文件
+            return new String(getClass().getClassLoader().getResourceAsStream(filePath).readAllBytes());
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to read file: " + filePath, e);
+        }
     }
 }
