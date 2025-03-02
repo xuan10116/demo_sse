@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Demo SSE Application</title>
+</head>
+<body>
+    <h1>Welcome to the Demo SSE Application</h1>
+    <p>This is the main page. You can navigate to the following features:</p>
+    <ul>
+        <li><a href="/chat/stream?clientId=client1" class="dynamic-link">Start Stream for Client 1</a></li>
+        <li><a href="/chat/stream?clientId=client2" class="dynamic-link">Start Stream for Client 2</a></li>
+        <li><a href="/chat/pause?clientId=client1" class="dynamic-link">Pause Client 1</a></li>
+        <li><a href="/chat/resume?clientId=client1" class="dynamic-link">Resume Client 1</a></li>
+        <li><a href="/chat/pause?clientId=client2" class="dynamic-link">Pause Client 2</a></li>
+        <li><a href="/chat/resume?clientId=client2" class="dynamic-link">Resume Client 2</a></li>
+        <li><a href="/chat/clients" class="dynamic-link">View All Clients Status</a></li>
+    </ul>
+
+    <!-- 修改：为每个操作添加独立的输出窗口 -->
+    <div style="display: flex; gap: 20px;">
+        <div id="output-client1" style="border: 1px solid #ccc; padding: 10px; flex: 1;">
+            <h3>Client 1 Output</h3>
+            <pre id="client1-content">Client 1 status will be displayed here dynamically.</pre>
+        </div>
+        <div id="output-client2" style="border: 1px solid #ccc; padding: 10px; flex: 1;">
+            <h3>Client 2 Output</h3>
+            <pre id="client2-content">Client 2 status will be displayed here dynamically.</pre>
+        </div>
+        <div id="output-all-clients" style="border: 1px solid #ccc; padding: 10px; flex: 1;">
+            <h3>All Clients Status</h3>
+            <pre id="all-clients-content">All clients status will be displayed here dynamically.</pre>
+        </div>
+    </div>
+
+    <script>
+        // 存储 EventSource 实例的映射，避免重复创建
+        const eventSources = {};
+
+        // 获取所有的动态链接并添加点击事件监听器
+        document.querySelectorAll('.dynamic-link').forEach(link => {
+            link.addEventListener('click', async (event) => {
+                event.preventDefault(); // 阻止默认跳转行为
+                const url = link.getAttribute('href'); // 获取链接的目标地址
+
+                if (url.startsWith('/chat/stream')) {
+                    const clientId = new URLSearchParams(new URL(url, window.location.origin).search).get('clientId');
+                    subscribeToSSE(clientId);
+                } else if (url.startsWith('/chat/clients')) {
+                    try {
+                        const response = await fetch(url);
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+                        const data = await response.text();
+                        document.getElementById('all-clients-content').textContent = data;
+                    } catch (error) {
+                        console.error('Error fetching data:', error);
+                        document.getElementById('all-clients-content').textContent = 'Failed to load content.';
+                    }
+                } else {
+                    try {
+                        const response = await fetch(url);
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+                        const data = await response.text();
+                        const clientId = new URLSearchParams(new URL(url, window.location.origin).search).get('clientId');
+                        const outputElement = document.getElementById(`${clientId}-content`);
+                        if (outputElement) {
+                            outputElement.textContent = data;
+                        }
+                    } catch (error) {
+                        console.error('Error fetching data:', error);
+                        const clientId = new URLSearchParams(new URL(url, window.location.origin).search).get('clientId');
+                        const outputElement = document.getElementById(`${clientId}-content`);
+                        if (outputElement) {
+                            outputElement.textContent = 'Failed to load content.';
+                        }
+                    }
+                }
+            });
+        });
+
+        // 订阅 SSE 的函数
+        function subscribeToSSE(clientId) {
+            if (eventSources[clientId]) {
+                console.warn(`Already subscribed to client: ${clientId}`);
+                return;
+            }
+
+            const eventSource = new EventSource(`/chat/stream?clientId=${clientId}`);
+            eventSources[clientId] = eventSource;
+
+            // 监听消息事件
+            eventSource.onmessage = (event) => {
+                const message = event.data;
+                const outputElement = document.getElementById(`${clientId}-content`);
+                if (outputElement) {
+                    const currentContent = outputElement.textContent;
+                    outputElement.textContent = `${currentContent}\n${message}`;
+                }
+            };
+
+            // 监听错误事件
+            eventSource.onerror = (error) => {
+                console.error('EventSource failed:', error);
+                eventSource.close();
+                delete eventSources[clientId];
+            };
+        }
+    </script>
+</body>
+</html>
