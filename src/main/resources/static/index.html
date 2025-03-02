@@ -16,6 +16,9 @@
         <li><a href="/chat/pause?clientId=client2" class="dynamic-link">Pause Client 2</a></li>
         <li><a href="/chat/resume?clientId=client2" class="dynamic-link">Resume Client 2</a></li>
         <li><a href="/chat/clients" class="dynamic-link">View All Clients Status</a></li>
+        <!-- 新增终止按钮 -->
+        <li><a href="/chat/stop?clientId=client1" class="dynamic-link">Stop Client 1</a></li>
+        <li><a href="/chat/stop?clientId=client2" class="dynamic-link">Stop Client 2</a></li>
     </ul>
 
     <!-- 修改：为每个操作添加独立的输出窗口 -->
@@ -40,13 +43,38 @@
         // 存储 EventSource 实例的映射，避免重复创建
         const eventSources = {};
 
-        // 获取所有的动态链接并添加点击事件监听器
+        // 修改动态链接点击事件监听器，支持终止操作
         document.querySelectorAll('.dynamic-link').forEach(link => {
             link.addEventListener('click', async (event) => {
                 event.preventDefault();
                 const url = link.getAttribute('href');
 
-                if (url.startsWith('/chat/stream')) {
+                if (url.startsWith('/chat/stop')) {
+                    const clientId = new URLSearchParams(new URL(url, window.location.origin).search).get('clientId');
+                    try {
+                        const response = await fetch(url);
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+                        const data = await response.text();
+                        const statusElement = document.getElementById(`${clientId}-status`);
+                        if (statusElement) {
+                            statusElement.textContent = data; // 更新状态显示
+                        }
+
+                        // 关闭对应的 EventSource 实例
+                        if (eventSources[clientId]) {
+                            eventSources[clientId].close();
+                            delete eventSources[clientId];
+                        }
+                    } catch (error) {
+                        console.error('Error stopping client:', error);
+                        const statusElement = document.getElementById(`${clientId}-status`);
+                        if (statusElement) {
+                            statusElement.textContent = 'Failed to stop client.';
+                        }
+                    }
+                } else if (url.startsWith('/chat/stream')) {
                     const clientId = new URLSearchParams(new URL(url, window.location.origin).search).get('clientId');
                     subscribeToSSE(clientId);
                 } else if (url.startsWith('/chat/clients')) {

@@ -19,17 +19,30 @@ public class ChatStreamController {
         this.clientPausedMap = new ConcurrentHashMap<>(); // 初始化客户状态存储
     }
 
+    @GetMapping("/chat/stop")
+    public String stop(@RequestParam String clientId) {
+        clientPausedMap.remove(clientId); // 移除客户端状态
+        return "Message stream stopped for client: " + clientId;
+    }
+
+    // 修改 flux 方法，增加对已移除客户端的检查
     @GetMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<String> flux(@RequestParam String clientId) {
+        // 确保 clientId 存在于 clientPausedMap 中，默认状态为未暂停
+        clientPausedMap.putIfAbsent(clientId, new AtomicBoolean(false));
         // 读取固定文件内容
-        String fileContent = readFileContent("static/twgx.txt"); // 假设文件路径为 static/sample.txt
+        String fileContent = readFileContent("static/twgx.txt");
 
-        // 将文件内容逐字拆分为字符流，并转换为 List 以符合 Iterable 接口要求
         return Flux.fromIterable(fileContent.chars()
-                        .mapToObj(c -> String.valueOf((char) c))
-                        .toList()) // 将 Stream 转换为 List
-                .delayElements(Duration.ofMillis(100)) // 模拟逐字返回
-                .filter(sequence -> !getClientStatus(clientId)); // 调用提取的公共方法
+                    .mapToObj(c -> String.valueOf((char) c))
+                    .toList())
+            .delayElements(Duration.ofMillis(100))
+            .filter(sequence -> {
+                if (!clientPausedMap.containsKey(clientId)) { // 检查客户端是否已终止
+                    throw new RuntimeException("Client stream terminated: " + clientId);
+                }
+                return !getClientStatus(clientId);
+            });
     }
 
     @GetMapping("/chat/pause")
