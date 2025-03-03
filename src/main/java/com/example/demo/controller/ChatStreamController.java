@@ -6,9 +6,16 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Flux;
 
+import java.io.IOException;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 
 @RestController
 public class ChatStreamController {
@@ -36,8 +43,8 @@ public class ChatStreamController {
         return Flux.fromIterable(fileContent.chars()
                 .mapToObj(c -> processCharacter(c)) // 调用提取的处理方法
                 .filter(json -> json != null) // 过滤掉无效的 JSON 数据
-                .toList())
-        .delayElements(Duration.ofMillis(100))
+                .collect(Collectors.toList())) // 使用 collect 方法替代 toList
+                .delayElements(Duration.ofMillis(100))
         .filter(sequence -> {
             if (!clientPausedMap.containsKey(clientId)) { // 检查客户端是否已终止
                 throw new RuntimeException("Client stream terminated: " + clientId);
@@ -99,9 +106,14 @@ public class ChatStreamController {
     // 新增方法：读取文件内容
     private String readFileContent(String filePath) {
         try {
-            // 使用类加载器读取资源文件
-            return new String(getClass().getClassLoader().getResourceAsStream(filePath).readAllBytes());
-        } catch (Exception e) {
+            // 使用类加载器获取资源路径
+            URL resourceUrl = getClass().getClassLoader().getResource(filePath);
+            if (resourceUrl == null) {
+                throw new RuntimeException("File not found: " + filePath);
+            }
+            Path path = Paths.get(resourceUrl.toURI());
+            return new String(Files.readAllBytes(path));
+        } catch (IOException | URISyntaxException e) {
             throw new RuntimeException("Failed to read file: " + filePath, e);
         }
     }
