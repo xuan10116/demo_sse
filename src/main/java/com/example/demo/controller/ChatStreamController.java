@@ -4,7 +4,7 @@ import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import reactor.core.publisher.Flux;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
@@ -12,10 +12,8 @@ import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.Duration;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.stream.Collectors;
 
 @RestController
 public class ChatStreamController {
@@ -32,25 +30,37 @@ public class ChatStreamController {
         return "Message stream stopped for client: " + clientId;
     }
 
-    // 修改 flux 方法，增加对已移除客户端的检查
+    // 修改 flux 方法为 stream 方法，使用 SseEmitter 实现 SSE
     @GetMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Flux<String> flux(@RequestParam String clientId) {
+    public SseEmitter stream(@RequestParam String clientId) {
+        SseEmitter emitter = new SseEmitter();
         // 确保 clientId 存在于 clientPausedMap 中，默认状态为未暂停
         clientPausedMap.putIfAbsent(clientId, new AtomicBoolean(false));
         // 读取固定文件内容
         String fileContent = readFileContent("static/twgx.txt");
 
-        return Flux.fromIterable(fileContent.chars()
-                .mapToObj(c -> processCharacter(c)) // 调用提取的处理方法
-                .filter(json -> json != null) // 过滤掉无效的 JSON 数据
-                .collect(Collectors.toList())) // 使用 collect 方法替代 toList
-                .delayElements(Duration.ofMillis(100))
-        .filter(sequence -> {
-            if (!clientPausedMap.containsKey(clientId)) { // 检查客户端是否已终止
-                throw new RuntimeException("Client stream terminated: " + clientId);
+        new Thread(() -> {
+            try {
+                for (char c : fileContent.toCharArray()) {
+                    if (!clientPausedMap.containsKey(clientId)) { // 检查客户端是否已终止
+                        emitter.complete();
+                        return;
+                    }
+                    if (!getClientStatus(clientId)) {
+                        String json = processCharacter(c); // 调用提取的处理方法
+                        if (json != null) { // 过滤掉无效的 JSON 数据
+                            emitter.send(SseEmitter.event().data(json));
+                        }
+                    }
+                    Thread.sleep(100);
+                }
+                emitter.complete();
+            } catch (Exception e) {
+                emitter.completeWithError(e);
             }
-            return !getClientStatus(clientId);
-        });
+        }).start();
+
+        return emitter;
     }
 
     @GetMapping("/chat/pause")
