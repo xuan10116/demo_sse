@@ -1,4 +1,4 @@
-package com.example.demo.controller;
+package com.example.demo.controller.lingmacode;
 
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;

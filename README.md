@@ -29,12 +29,13 @@ src/
 │   │       │   ├── AllSchedulersController.java    # 所有调度器使用示例
 │   │       │   ├── DefaultSchedulerController.java # 默认调度器行为示例
 │   │       │   ├── ReactorBestPracticesController.java # 最佳实践示例
-│   │       │   └── CommonIssuesController.java    # 常见问题及解决方案
+│   │       │   ├── CommonIssuesController.java    # 常见问题及解决方案
+│   │       │   └── BackpressureStrategiesController.java # 背压策略示例
 │   │       └── DemoSseApplication.java            # 应用启动类
 │   └── resources/
 │       ├── static/
 │       │   ├── index.html                         # SSE演示页面
-│   │   └── twgx.txt                           # 示例文本文件
+│       │   └── twgx.txt                           # 示例文本文件
 │       └── application.properties                 # 应用配置
 └── test/
     └── java/
@@ -104,9 +105,8 @@ src/
 
 通过 [DefaultSchedulerController](src/main/java/com/example/demo/controller/DefaultSchedulerController.java) 类学习默认调度器行为：
 
-- **默认调度器行为**: 不指定调度器时的执行情况
-- **阻塞操作影响**: 在默认线程上执行阻塞操作的问题
-- **非阻塞操作**: 正常的非阻塞操作表现
+- **默认调度器**: 了解各种操作符的默认调度器行为
+- **线程继承**: 理解线程如何在操作符间传递
 
 访问以下端点查看示例：
 - `/schedulers/default-thread` - 默认线程执行示例
@@ -123,89 +123,59 @@ src/
 - `/all-schedulers/parallel` - parallel 调度器使用
 - `/all-schedulers/custom` - 自定义调度器使用
 - `/all-schedulers/comparison` - 调度器对比
-- `/default-scheduler/default-behavior` - 默认调度器行为
-- `/default-scheduler/comparison` - 调度器对比
-- `/default-scheduler/blocking-default` - 默认调度器上的阻塞操作
-- `/default-scheduler/non-blocking-default` - 默认调度器上的非阻塞操作
+- `/default-scheduler/behavior` - 默认调度器行为
 
-#### Reactor 调度器详解
+### 4. 背压处理策略
 
-Reactor 提供了多种调度器来满足不同的使用场景，每种调度器都有其特定的用途和实现方式：
+通过 [BackpressureStrategiesController](src/main/java/com/example/demo/controller/BackpressureStrategiesController.java) 类学习背压处理策略：
 
-```mermaid
-graph LR
-    A[Schedulers] --> B[Schedulers.immediate]
-    A --> C[Schedulers.single]
-    A --> D[Schedulers.boundedElastic]
-    A --> E[Schedulers.parallel]
-    
-    B --> B1["在当前线程执行<br/>适用于简单快速操作"]
-    C --> C1["全局单线程<br/>适用于轻量级非并行任务"]
-    D --> D1["有界弹性线程池<br/>适用于I/O密集型和阻塞操作"]
-    E --> E1["固定大小线程池<br/>适用于CPU密集型任务"]
-    
-    classDef scheduler fill:#98fb98,stroke:#333;
-    classDef detail fill:#e0ffff,stroke:#333;
-    
-    class A,B,C,D,E scheduler
-    class B1,C1,D1,E1 detail
-```
+- **Buffer策略**: 缓冲多余的元素直到达到指定的限制
+- **Drop策略**: 当下游无法跟上时，丢弃多余的元素
+- **Latest策略**: 当下游无法跟上时，只保留最新的元素
+- **Error策略**: 当下游无法跟上时，发出一个错误信号
+- **LimitRate策略**: 控制上游发布者的请求速率
+- **自定义策略**: 组合使用不同的背压策略
+- **Sample策略**: 以指定的时间间隔采样数据流
+- **Window策略**: 将数据流分组处理
 
-1. **Schedulers.immediate()**
-   - 在当前线程执行任务，不进行线程切换
-   - 适用于快速、简单的操作
-   - 示例代码:
-     ```java
-     Flux.range(1, 5)
-         .map(i -> i * 2)
-         .subscribeOn(Schedulers.immediate())
-         .subscribe();
-     ```
+访问以下端点查看示例：
+- `/backpressure/buffer` - Buffer策略示例
+- `/backpressure/drop` - Drop策略示例
+- `/backpressure/latest` - Latest策略示例
+- `/backpressure/error` - Error策略示例
+- `/backpressure/limit-rate` - LimitRate策略示例
+- `/backpressure/custom` - 自定义策略示例
+- `/backpressure/sample` - Sample策略示例
+- `/backpressure/window-buffer` - Window策略示例
 
-2. **Schedulers.single()**
-   - 使用全局单线程执行所有任务
-   - 保证任务顺序执行
-   - 示例代码:
-     ```java
-     Flux.range(1, 5)
-         .publishOn(Schedulers.single())
-         .map(i -> {
-             System.out.println("在线程 " + Thread.currentThread().getName() + " 上执行");
-             return i * 2;
-         })
-         .subscribe();
-     ```
+### 5. 最佳实践和常见问题
 
-3. **Schedulers.boundedElastic()**
-   - 有界弹性线程池，适用于I/O密集型和阻塞操作
-   - 线程数默认为 CPU 核心数 × 10
-   - 任务队列最大容量为 100,000
-   - 示例代码:
-     ```java
-     Mono.fromCallable(() -> {
-         // 模拟阻塞操作
-         Thread.sleep(1000);
-         return "阻塞操作完成";
-     })
-     .subscribeOn(Schedulers.boundedElastic())
-     .subscribe();
-     ```
+通过 [ReactorBestPracticesController](src/main/java/com/example/demo/controller/ReactorBestPracticesController.java) 类学习 Reactor 最佳实践：
 
-4. **Schedulers.parallel()**
-   - 固定大小线程池，大小等于 CPU 核心数
-   - 适用于CPU密集型任务
-   - 示例代码:
-     ```java
-     Flux.range(1, 10)
-         .publishOn(Schedulers.parallel())
-         .map(i -> {
-             // CPU 密集型计算
-             return performCpuIntensiveCalculation(i);
-         })
-         .subscribe();
-     ```
+- **避免阻塞操作**: 如何正确处理阻塞操作
+- **资源共享**: 正确处理共享可变状态
+- **缓存**: 合理使用缓存提高性能
+- **错误处理**: 正确处理和恢复错误
 
-### 4. Reactor 测试
+通过 [CommonIssuesController](src/main/java/com/example/demo/controller/CommonIssuesController.java) 类学习如何解决常见问题：
+
+- **线程安全**: 避免共享可变状态引发的问题
+- **错误处理**: 正确处理和恢复错误
+- **背压处理**: 正确处理背压问题
+- **资源管理**: 正确管理订阅和资源
+
+访问以下端点查看示例：
+- `/best-practices/avoid-blocking` - 避免阻塞操作示例
+- `/best-practices/shared-state` - 共享状态处理示例
+- `/best-practices/caching` - 缓存使用示例
+- `/common-issues/mutable-state-issue` - 可变状态问题示例
+- `/common-issues/mutable-state-solution` - 可变状态解决方案示例
+- `/common-issues/error-handling-issue` - 错误处理问题示例
+- `/common-issues/error-handling-solution` - 错误处理解决方案示例
+- `/common-issues/backpressure-issue` - 背压处理问题示例
+- `/common-issues/backpressure-solution` - 背压处理解决方案示例
+
+### 6. Reactor 测试
 
 通过 [ReactorTestingExamples](src/test/java/com/example/demo/ReactorTestingExamples.java) 类学习如何测试响应式流：
 
@@ -219,130 +189,28 @@ graph LR
 ./mvnw test
 ```
 
-### 5. 最佳实践
-
-通过 [ReactorBestPracticesController](src/main/java/com/example/demo/controller/ReactorBestPracticesController.java) 类学习 Reactor 的最佳实践：
-
-- **避免阻塞操作**: 正确使用调度器处理阻塞操作
-- **状态管理**: 避免共享可变状态
-- **缓存使用**: 合理使用 cache 操作符
-- **错误处理**: 正确的错误处理策略
-- **操作符选择**: 根据场景选择合适的操作符
-- **资源管理**: 使用 usingWhen 箴理资源生命周期
-
-访问以下端点查看示例：
-- `/best-practices/avoid-blocking` - 避免阻塞操作示例
-- `/best-practices/shared-state` - 共享状态处理示例
-- `/best-practices/caching` - 缓存使用示例
-- `/best-practices/error-handling` - 错误处理示例
-- `/best-practices/operator-selection` - 操作符选择示例
-- `/best-practices/resource-management` - 资源管理示例
-
-### 6. 常见问题及解决方案
-
-通过 [CommonIssuesController](src/main/java/com/example/demo/controller/CommonIssuesController.java) 类学习常见问题及解决方案：
-
-- **阻塞操作问题**: 在响应式流中错误使用阻塞操作
-- **共享状态问题**: 多线程环境下共享可变状态的问题
-- **错误处理问题**: 不当的错误处理方式
-- **背压处理问题**: 未正确处理背压导致的问题
-- **订阅管理问题**: 未正确管理订阅导致的内存泄漏
-
-访问以下端点查看示例：
-- `/common-issues/blocking-mistake` - 阻塞操作问题示例
-- `/common-issues/blocking-solution` - 阻塞操作解决方案
-- `/common-issues/mutable-state-issue` - 共享状态问题示例
-- `/common-issues/mutable-state-solution` - 共享状态解决方案
-- `/common-issues/error-handling-issue` - 错误处理问题示例
-- `/common-issues/error-handling-solution` - 错误处理解决方案
-- `/common-issues/backpressure-issue` - 背压处理问题示例
-- `/common-issues/backpressure-solution` - 背压处理解决方案
-
-## 运行项目
+## 项目运行
 
 ### 环境要求
-
 - JDK 8 或更高版本
-- Maven 3.2+
+- Maven 3.x
 
 ### 构建和运行
-
-使用 Maven 运行项目：
-
 ```bash
-./mvnw spring-boot:run
-```
-
-或者打包后运行：
-
-```bash
+# 构建项目
 ./mvnw clean package
-java -jar target/demo-sse-1.0-SNAPSHOT.jar
+
+# 运行项目
+./mvnw spring-boot:run
+
+# 或者直接运行jar包
+java -jar target/demo-sse-0.0.1-SNAPSHOT.jar
 ```
 
-### 访问应用
+访问 [http://localhost:8080](http://localhost:8080) 查看演示页面。
 
-项目启动后，可以访问以下地址：
+## 学习资源
 
-- 主页: http://localhost:8080/
-- SSE 聊天示例: http://localhost:8080/index.html
-- 各种学习示例: 参考上面的端点列表
-
-## 学习路径建议
-
-1. **理解基础概念**: 从 ReactorExamplesController 开始，理解 Flux 和 Mono 的基本用法
-2. **掌握操作符**: 学习各种操作符的使用方法和适用场景
-3. **对比学习**: 通过 WebFluxVsMvcController 理解响应式编程的优势
-4. **深入调度器**: 学习调度器的使用，理解线程模型
-5. **实践最佳实践**: 学习并应用最佳实践
-6. **避免常见问题**: 了解常见问题及其解决方案
-7. **掌握测试方法**: 学习如何测试响应式流
-
-## 技术分享要点
-
-如果您需要基于此项目进行技术分享，可以按照以下结构组织内容：
-
-1. **响应式编程概述**
-   - 什么是响应式编程
-   - 为什么需要响应式编程
-   - Reactor 和 WebFlux 简介
-
-2. **核心概念详解**
-   - Flux 和 Mono
-   - 发布者-订阅者模式
-   - 背压机制
-
-3. **操作符详解**
-   - 创建操作符
-   - 转换操作符
-   - 过滤操作符
-   - 组合操作符
-   - 错误处理操作符
-
-4. **WebFlux 与传统 MVC 对比**
-   - 线程模型对比
-   - 性能对比
-   - 适用场景
-
-5. **调度器使用**
-   - 不同类型调度器
-   - 调度器选择原则
-   - 实际应用示例
-
-6. **最佳实践**
-   - 避免阻塞操作
-   - 正确处理错误
-   - 合理使用缓存
-   - 资源管理
-
-7. **常见问题及解决方案**
-   - 阻塞操作问题
-   - 共享状态问题
-   - 背压处理问题
-   - 内存泄漏问题
-
-8. **测试响应式流**
-   - StepVerifier 使用
-   - 不同场景测试方法
-
-通过这些内容的学习和实践，您将能够深入理解 Project Reactor 和 Spring WebFlux，并具备在团队内进行技术分享的能力。
+1. [Project Reactor 官方文档](https://projectreactor.io/docs/core/release/reference/)
+2. [Reactor 中文文档](https://htmlpreview.github.io/?https://github.com/get-set/reactor-core/blob/master-zh/src/docs/index.html)
+3. [Reactive Streams 规范](https://www.reactive-streams.org/)

@@ -1,4 +1,4 @@
-package com.example.demo.controller;
+package com.example.demo.controller.sharedemo;
 
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -43,6 +43,21 @@ public class AllSchedulersController {
                 })
                 .delayElements(Duration.ofSeconds(1)); // 添加延迟以便观察
     }
+    /**
+     * 示例2.2: Schedulers.newSingle() - 全局单线程
+     * 适用于轻量级、快速完成的操作
+     */
+    @GetMapping(value = "/newSingle", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<String> newSingleScheduler() {
+        return Flux.range(1, 5)
+                .map(i -> {
+                    String threadName = Thread.currentThread().getName();
+                    return "数据 " + i + " 在线程 " + threadName;
+                })
+                .subscribeOn(Schedulers.newSingle("new的single调度器")) // 在当前线程执行
+                .map(data -> data + " -> 使用 自定义new的 single调度器");
+    }
+
 
     /**
      * 示例3: Schedulers.boundedElastic() - 有界弹性线程池

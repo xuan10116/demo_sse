@@ -1,11 +1,8 @@
-package com.example.demo.controller;
+package com.example.demo.controller.sharedemo;
 
 import org.reactivestreams.Subscription;
 import reactor.core.publisher.BaseSubscriber;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
-
-import java.time.Duration;
 
 /**
  * @author lvxuan
@@ -13,7 +10,7 @@ import java.time.Duration;
  * @description: TODO
  * @date 2025/8/12
  */
-public class TestDemo {
+public class SubscriberDemo {
 	public static void main(String[] args) {
 		// 方法1：使用自定义的SampleSubscriber
 		System.out.println("=== 使用SampleSubscriber ===");
@@ -39,7 +36,7 @@ public class TestDemo {
 						() -> System.out.println("Completed") // onComplete
 				);
 
-		// 方法3：使用带有Subscription Consumer的subscribe方法（原始代码的问题所在）
+		// 方法3：使用带有Subscription Consumer的subscribe方法
 		System.out.println("\n=== 使用Subscription Consumer的subscribe方法 ===");
 		Flux.just("1", "2", "3")
 				.map(s -> "Number: " + s)

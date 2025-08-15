@@ -1,4 +1,4 @@
-package com.example.demo.controller;
+package com.example.demo.controller.sharedemo;
 
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -24,6 +24,8 @@ public class ReactorExamplesController {
      */
     @GetMapping(value = "/flux-basic", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<String> basicFlux() {
+//        final Flux<String> just = Flux.just("Hello", "World");
+//        final Flux<String> range = Flux.range(1, 5).map(i -> "数据 " + i + " at " + LocalDateTime.now());
         // 创建一个简单的Flux，每隔1秒发送一个数字
         return Flux.interval(Duration.ofSeconds(1))
                 .take(10) // 限制为10个元素
@@ -82,8 +84,8 @@ public class ReactorExamplesController {
      * 示例5: 合并操作符
      * 展示zip、merge等合并操作符
      */
-    @GetMapping(value = "/combining", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Flux<String> combiningOperators() {
+    @GetMapping(value = "/merge", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<String> mergeOperators() {
         // 创建两个不同的Flux
         Flux<String> flux1 = Flux.interval(Duration.ofSeconds(1))
                 .map(i -> "Flux1: " + i)
@@ -95,6 +97,26 @@ public class ReactorExamplesController {
                 
         // 合并两个Flux
         return Flux.merge(flux1, flux2)
+                .map(data -> data + " at " + LocalDateTime.now());
+    }
+
+    /**
+     * 示例5: 合并操作符
+     * 展示zip、merge等合并操作符
+     */
+    @GetMapping(value = "/zip", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<String> zipOperators() {
+        // 创建两个不同的Flux
+        Flux<String> flux1 = Flux.interval(Duration.ofSeconds(1))
+                .map(i -> "Flux1: " + i)
+                .take(5);
+
+        Flux<String> flux2 = Flux.interval(Duration.ofMillis(500))
+                .map(i -> "Flux2: " + i)
+                .take(10);
+
+        // 合并两个Flux
+        return Flux.zip(flux1, flux2)
                 .map(data -> data + " at " + LocalDateTime.now());
     }
 

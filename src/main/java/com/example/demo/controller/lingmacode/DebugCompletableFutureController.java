@@ -1,4 +1,4 @@
-package com.example.demo.controller;
+package com.example.demo.controller.lingmacode;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

@@ -86,9 +86,9 @@ graph LR
     A[Client] --> B[Controller.boundedElasticScheduler]
     B --> C[Schedulers.boundedElastic]
     C --> D[Worker: BoundedElasticWorker]
-    D --> E[TaskQueue: 有界队列(100k)]
+    D --> E[TaskQueue: 有界队列100k]
     E --> F[Thread: 执行 map 操作符]
-    F --> G[执行 simulateBlockingOperation()]
+    F --> G[执行 simulateBlockingOperation]
     F --> H[Client: 返回处理结果]
     
     classDef core fill:#98fb98,stroke:#333;
@@ -161,5 +161,3 @@ graph LR
 3. **任务排队**：任务被放入 Worker 的队列
 4. **线程调度**：线程从队列获取任务执行
 5. **资源管理**：线程复用和回收机制
-
-理解这个过程有助于我们更好地选择和使用调度器，充分发挥 Reactor 的性能优势。
