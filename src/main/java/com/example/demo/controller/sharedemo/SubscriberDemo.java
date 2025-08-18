@@ -12,7 +12,19 @@ import reactor.core.publisher.Flux;
  */
 public class SubscriberDemo {
 	public static void main(String[] args) {
-		// 方法1：使用自定义的SampleSubscriber
+
+		// 方法1：使用带有多个参数的subscribe方法
+		System.out.println("\n=== 使用subscribe方法的多个参数 ===");
+		Flux.just("x", "y", "z")
+				.map(String::toUpperCase)
+				.log()
+				.subscribe(
+						System.out::println,           // onNext
+						Throwable::printStackTrace,    // onError
+						() -> System.out.println("Completed") // onComplete
+				);
+
+		// 方法2：使用自定义的SampleSubscriber
 		System.out.println("=== 使用SampleSubscriber ===");
 		SampleSubscriber<String> subscriber = new SampleSubscriber<>();
 		Flux.just("a", "b", "c")
@@ -25,16 +37,6 @@ public class SubscriberDemo {
 		} catch (InterruptedException e) {
 			throw new RuntimeException(e);
 		}
-
-		// 方法2：使用带有多个参数的subscribe方法
-		System.out.println("\n=== 使用subscribe方法的多个参数 ===");
-		Flux.just("x", "y", "z")
-				.map(String::toUpperCase)
-				.subscribe(
-						System.out::println,           // onNext
-						Throwable::printStackTrace,    // onError
-						() -> System.out.println("Completed") // onComplete
-				);
 
 		// 方法3：使用带有Subscription Consumer的subscribe方法
 		System.out.println("\n=== 使用Subscription Consumer的subscribe方法 ===");

@@ -4,31 +4,21 @@
 
 响应式编程是一种关注于数据流（data streams）和变化传播（propagation of change）的异步编程方式。 
 
-Reactive Streams，是响应式系统的跨平台、跨库通用协议，是一种 规范
+Reactive Streams，是响应式系统的跨平台、跨库通用协议，是一种 规范。
+
+![image-20250815164306330](TEXT.assets/image-20250815164306330.png)
 
 - 定义响应式流的标准接口
-  -   `Publisher<T>`, `Subscriber<T>`, `Subscription`, `Processor<T,R>`
+  -   `Publisher<T>`:发布者，负责发布数据流中的元素。
+  -    `Subscriber<T>`:订阅者，接收并处理发布者发布的元素。
+  -   `Subscription`:订阅，表示订阅者与发布者之间的连接，订阅者可以使用它来请求元素或取消订阅。
+  -   `Processor<T,R>`:处理器，既是发布者又是订阅者，可以转换或处理数据流。
 - 规范**非阻塞背压机制**
 
-
-
-Publisher:发布者，负责发布数据流中的元素。
-
-Subscriber: 订阅者，接收并处理发布者发布的元素。
-
-Subscription:订阅，表示订阅者与发布者之间的连接，订阅者可以使用它来请求元素或取消订阅。
-
-Processor:处理器，既是发布者又是订阅者，可以转换或处理数据流。
-
-
+> 把 Subscriber、Publisher 和 Subscription 这三个关键元素以及它们之间的交互流程整合成一个完整的工作流程，从而实现一个可控制、可取消、背压（backpressure）友好的数据流系统。 
+>
 
 ![image-20250815144310240](TEXT.assets/image-20250815144310240.png)
-
-
-
-https://www.reactive-streams.org/
-
-[Reactor中文文档](https://htmlpreview.github.io/?https://github.com/get-set/reactor-core/blob/master-zh/src/docs/index.html#getting-started-introducing-reactor)
 
 
 
@@ -118,9 +108,41 @@ while (iterator.hasNext()) {
 
 
 
+### Flux、Mono、操作符
+
+Project Reactor提供了 Publisher<T>接口的实现，即Flux<T>和Mono<T>。
+
+`Flux<T>`：表示**0-N 个元素**的响应式流
+
+`Mono<T>`：表示**0-1 个元素**的响应式流
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ### 生命周期
 
-一、组装时
+##### 一、组装时
 
 - 构建复杂的元素处理流程
 - 不变性，每个被使用的操作符都会生成一个新对象。
@@ -136,7 +158,7 @@ while (iterator.hasNext()) {
 
 
 
-二、订阅时
+##### 二、订阅时
 
 当调用指定 Publisher 的 subscribe 方法时，就会发生订阅。
 
@@ -150,11 +172,35 @@ while (iterator.hasNext()) {
 
 
 
-三、运行时
+##### 订阅时——》运行时
+
+(1) 订阅时，是瞬间的操作（调用`subscribe()`的那一刻）
+
+```mermaid
+sequenceDiagram
+    participant Subscriber
+    participant Publisher
+
+    Subscriber->>Publisher: subscribe(subscriber)
+    activate Publisher
+    Publisher->>Publisher: 创建 Subscription 实例
+    Publisher->>Subscriber: onSubscribe(subscription)
+    deactivate Publisher
+```
+
+- `Subscription` 在此时被 **创建并传递**。
+- 这个过程是**同步的**，不涉及异步调度。
+- 此时还没有任何数据发送（没有 `onNext`）。
+
+(2) 从 `Subscriber` 收到 `Subscription` 后，开始进入“运行时”阶段。
+
+
+
+##### 三、运行时
 
 在 Publisher 和 Subscriber之间进行实际信号交换。
 
-响应式流规范规定，Publisher 和 Subscriber 交换的前两个信号是 onSubscribe()信号和 request()信号
+响应式流规范规定，Publisher 和 Subscriber 交换的前两个信号是 onSubscribe信号和 request信号
 
 - 必须先请求再接收: Subscriber必须先调用request()方法，否则Publisher不会发送任何数据
 - 信号顺序: 信号严格按照规范顺序发送，保证了流的正确性
@@ -172,6 +218,8 @@ Publisher                  Subscriber
     |                          |
     |---- onSubscribe(s) ----->| (2) 发送Subscription
     |                          |
+---------------运行时------------------  
+    |                          |
     |<------ request(n) -------| (3) 请求n个元素
     |                          |
     |------- onNext(d) ------->| (4) 发送数据
@@ -185,9 +233,13 @@ Publisher                  Subscriber
 
 
 
+![image-20250815154547191](TEXT.assets/image-20250815154547191.png)
+
+
+
 ##### tip
 
-通常我们直接 Publisher调用subscribe方法， 并没有手动创建Subscriber。
+1、通常我们直接 Publisher调用subscribe方法， 并没有手动创建Subscriber。
 
 此时Reactor内部会创建一个Subscriber实现，自动发送request信号。
 
@@ -206,7 +258,19 @@ Flux.just("x", "y", "z")
 
 
 
-![image-20250815154547191](TEXT.assets/image-20250815154547191.png)
+2、当你需要自定义 Subscriber 时：
+
+🔹 **不要从头实现 `Subscriber` 接口，**要继承 **`BaseSubscriber<T>`**
+🔹 **只重写你需要的 `hookOnXxx` 方法** 
+
+| 对比               | 自行实现 Subscriber接口                                      | 集成BaseSubscriber                                           |
+| ------------------ | ------------------------------------------------------------ | ------------------------------------------------------------ |
+| **背压控制**       | 1、需要手动实现：<br />必须在`onSubscribe`和`onNext`中显式调用`subscription.request(n)`；<br />2、可能会忘记首次request(n)，导致数据流永不启动 | 封装了`request(n)`方法，内部自动绑定当前`Subscription`，调用即生效。 |
+| **安全性与健壮性** | 1、线程安全问题<br />2、重复订阅问题<br />3、异常传播问题<br /> | 1、 内部使用`AtomicReference`和状态机，确保线程安全操作Subscription<br />2、 只接受一次`onSubscribe`，后续调用会触发`onError`并忽略<br />3、安全回调`hookOnError`，父类已处理异常传播边界<br /> |
+| **取消与资源管理** | 无法感知取消事件, 需手动                                     | 重写`hookOnCancel()`关闭流、释放资源                         |
+| **推荐程度**       | ❌ 不推荐<br />灵活但危险：完全暴露底层，容易破坏背压协议     | ✅ 官方推荐<br />安全灵活：既保留控制权，又防止常见错误（如空指针、重复请求） |
+
+
 
 
 
@@ -418,9 +482,9 @@ public final <R> Flux<R> flatMap(Function<? super T, ? extends Publisher<? exten
 在Reactor的flatMap操作符中，inner publisher（内部发布者）是指由上游每个元素转换而来的新Publisher。这些Publisher被称为"内部"的，因为它们是由flatMap操作动态创建和管理的，而不是来自外部的数据源。
 
 1. 动态创建
-    每个上游元素都会触发一个新的inner publisher的创建：
+    每个上游元素都会触发一个新的inner publisher的创建
 2. 并发执行
-    所有的inner publisher会同时运行，而不是顺序执行：
+    所有的inner publisher会同时运行，而不是顺序执行
 
 ##### 异步展平
 

@@ -1,6 +1,7 @@
 package com.example.demo.controller.sharedemo;
 
 import org.springframework.http.MediaType;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -28,6 +29,7 @@ public class ReactorExamplesController {
 //        final Flux<String> range = Flux.range(1, 5).map(i -> "数据 " + i + " at " + LocalDateTime.now());
         // 创建一个简单的Flux，每隔1秒发送一个数字
         return Flux.interval(Duration.ofSeconds(1))
+                .log()
                 .take(10) // 限制为10个元素
                 .map(i -> "Flux item: " + i + " at " + LocalDateTime.now());
     }
@@ -43,10 +45,30 @@ public class ReactorExamplesController {
     }
 
     /**
+     * 示例2: Mono的empty和never
+     * 展示Mono的特殊状态
+     */
+    @GetMapping("/mono-special")
+    public Mono<String> monoSpecial() {
+        // 创建一个空的Mono，立即完成
+        Mono<String> emptyMono = Mono.empty();
+        
+        // 创建一个永远不会发送数据也不会完成的Mono
+        Mono<String> neverMono = Mono.never();
+        
+        // 创建一个立即完成的Mono
+        Mono<String> justMono = Mono.just("立即完成的Mono at " + LocalDateTime.now());
+        
+        // 这里我们返回一个组合的结果
+        return Mono.when(emptyMono, justMono)
+                .then(Mono.just("多个Mono处理完成 at " + LocalDateTime.now()));
+    }
+
+    /**
      * 示例3: 错误处理
      * 展示Reactor中的错误处理机制
      */
-    @GetMapping(value = "/error-handling", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @GetMapping(value = "/errorResume-handling", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<String> errorHandling() {
         return Flux.interval(Duration.ofSeconds(1))
                 .flatMap(i -> {
@@ -60,6 +82,22 @@ public class ReactorExamplesController {
                     // 错误恢复，返回替代值
                     return Mono.just("错误已处理: " + e.getMessage());
                 })
+                .log()
+                .map(data -> data + " processed at " + LocalDateTime.now());
+    }
+    @GetMapping(value = "/errorContinue-handling", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<String> errorContinueHandling() {
+        return Flux.interval(Duration.ofSeconds(1))
+                .flatMap(i -> {
+                    if (i == 3) {
+                        // 模拟错误情况
+                        return Mono.error(new RuntimeException("模拟错误发生在: " + i));
+                    }
+                    return Mono.just("正常数据: " + i);
+                })
+                .log()
+                .takeUntil(i -> i.length() > 7)
+                .onErrorContinue(RuntimeException.class, (e, v) -> System.out.println("错误已处理: " + e.getMessage()))
                 .map(data -> data + " processed at " + LocalDateTime.now());
     }
 
@@ -82,27 +120,27 @@ public class ReactorExamplesController {
 
     /**
      * 示例5: 合并操作符
-     * 展示zip、merge等合并操作符
+     * merge
      */
     @GetMapping(value = "/merge", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<String> mergeOperators() {
-        // 创建两个不同的Flux
         Flux<String> flux1 = Flux.interval(Duration.ofSeconds(1))
                 .map(i -> "Flux1: " + i)
                 .take(5);
-                
-        Flux<String> flux2 = Flux.interval(Duration.ofMillis(500))
-                .map(i -> "Flux2: " + i)
-                .take(10);
+//        Flux<String> flux2 = Flux.interval(Duration.ofSeconds(1))
+//                .map(i -> "Flux2: " + i)
+//                .take(5);
+        Mono<String> mono1 = Mono.delay(Duration.ofMillis(500))
+                .map(i -> "Mono1: " + i);
                 
         // 合并两个Flux
-        return Flux.merge(flux1, flux2)
+        return Flux.merge(flux1, mono1)
                 .map(data -> data + " at " + LocalDateTime.now());
     }
 
     /**
      * 示例5: 合并操作符
-     * 展示zip、merge等合并操作符
+     * zip
      */
     @GetMapping(value = "/zip", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<String> zipOperators() {
@@ -122,7 +160,7 @@ public class ReactorExamplesController {
 
     /**
      * 示例6: 缓存和批处理
-     * 展示buffer和window操作符
+     * Buffer示例 - 直接将元素分组为集合
      */
     @GetMapping(value = "/buffering", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<String> buffering() {
@@ -135,11 +173,41 @@ public class ReactorExamplesController {
     }
 
     /**
-     * 示例7: 条件操作符
-     * 展示takeUntil、skipWhile等条件操作符
+     * 示例6: 缓存和批处理
+     * window操作符示例 - 将元素分组为内部Flux流
      */
-    @GetMapping(value = "/conditional", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Flux<String> conditional() {
+    @GetMapping(value = "/window-example", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<String> windowExample() {
+        return Flux.interval(Duration.ofMillis(100))
+                .take(20)
+                .window(5) // 每5个元素分为一组窗口
+                .flatMap(window -> 
+                    window.reduce("", (acc, value) -> acc + " " + value)
+                         .map(reduced -> "窗口数据: [" + reduced.trim() + "]")
+                );
+    }
+
+    /**
+     * 基于时间的window示例
+     * 展示如何基于时间窗口处理数据
+     */
+    @GetMapping(value = "/window-time-based", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<String> timeBasedWindow() {
+        return Flux.interval(Duration.ofMillis(100))
+                .take(30)
+                .window(Duration.ofSeconds(1)) // 每1秒创建一个新窗口
+                .flatMap(window -> 
+                    window.count()
+                         .map(count -> "在1秒时间窗口内收到 " + count + " 个元素")
+                );
+    }
+
+    /**
+     * 示例7: 条件操作符
+     * takeUntil
+     */
+    @GetMapping(value = "/takeUntil-conditional", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<String> takeConditional() {
         Random random = new Random();
         
         return Flux.interval(Duration.ofMillis(500))
@@ -148,41 +216,20 @@ public class ReactorExamplesController {
                 .map(i -> "随机数: " + i);
     }
 
-    /**
-     * 示例8: 转换操作符
-     * 展示flatMap、concatMap等转换操作符
-     */
-    @GetMapping(value = "/transforming", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Flux<String> transforming() {
-        return Flux.just("a", "b", "c")
-                .concatMap(s -> {
-                    // concatMap保证顺序
-                    return Flux.interval(Duration.ofMillis(300))
-                            .take(3)
-                            .map(i -> s + "-" + i);
-                });
-    }
 
     /**
-     * 示例9: 实际应用场景 - 模拟聊天消息流
-     * 结合现有SSE功能，展示实际应用
+     * 示例7: 条件操作符
+     * skipWhile
      */
-    @GetMapping(value = "/chat-example", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Flux<String> chatExample() {
-        List<String> users = Arrays.asList("Alice", "Bob", "Charlie");
-        List<String> messages = Arrays.asList("Hello!", "How are you?", "Fine, thanks!", 
-                                            "What's up?", "Not much", "Bye!");
-        
-        return Flux.interval(Duration.ofSeconds(1))
-                .zipWith(Flux.fromIterable(users).repeat())
-                .zipWith(Flux.fromIterable(messages).repeat())
-                .map(tuple -> {
-                    Tuple2<Tuple2<Long, String>, String> tuple2 = (Tuple2<Tuple2<Long, String>, String>) tuple;
-                    return String.format("[%s] %s: %s", 
-                                       LocalDateTime.now().toString(), 
-                                       tuple2.getT1().getT2(), 
-                                       tuple2.getT2());
-                })
-                .take(10);
+    @GetMapping(value = "/skip-conditional", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<String> skipConditional() {
+        Random random = new Random();
+
+        return Flux.interval(Duration.ofMillis(500))
+                .log()
+                .map(i -> random.nextInt(100)) // 生成0-100的随机数
+                .skipWhile(i -> i < 50) // 当遇到大于50的数开始
+                .takeUntil(i -> i > 90) // 当遇到大于90的数时停止
+                .map(i -> "随机数: " + i);
     }
 }
