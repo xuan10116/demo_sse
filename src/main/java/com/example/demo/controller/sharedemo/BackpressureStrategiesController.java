@@ -1,4 +1,4 @@
-package com.example.demo.controller.lingmacode;
+package com.example.demo.controller.sharedemo;
 
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -23,10 +23,17 @@ public class BackpressureStrategiesController {
     @GetMapping(value = "/buffer", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<String> backpressureBuffer() {
         return Flux.interval(Duration.ofMillis(1))
-                .onBackpressureBuffer(100, 
-                    item -> logger.info("丢弃的项目: " + item))
-                .take(300)
-                .map(i -> "Buffer策略处理数据: " + i);
+                .onBackpressureBuffer(10,
+                    item -> logger.info("buffer队列溢出: " + item))
+                .take(100)
+                .map(i -> {
+					try {
+						Thread.sleep(100);
+					} catch (InterruptedException e) {
+						throw new RuntimeException(e);
+					}
+					return "Buffer策略处理数据: " + i;
+                });
     }
 
     /**
@@ -37,8 +44,15 @@ public class BackpressureStrategiesController {
     public Flux<String> backpressureDrop() {
         return Flux.interval(Duration.ofMillis(1))
                 .onBackpressureDrop(item -> logger.info("丢弃的项目: " + item))
-                .take(300)
-                .map(i -> "Drop策略处理数据: " + i);
+                .take(30)
+                .map(i -> {
+                    try {
+                        Thread.sleep(100);
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
+                    return "Drop策略处理数据: " + i;
+                });
     }
 
     /**
@@ -49,8 +63,15 @@ public class BackpressureStrategiesController {
     public Flux<String> backpressureLatest() {
         return Flux.interval(Duration.ofMillis(1))
                 .onBackpressureLatest()
-                .take(300)
-                .map(i -> "Latest策略处理数据: " + i);
+                .take(30)
+                .map(i -> {
+                    try {
+                        Thread.sleep(100);
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
+                    return "Latest策略处理数据: " + i;
+                });
     }
 
     /**
@@ -61,7 +82,14 @@ public class BackpressureStrategiesController {
     public Flux<String> backpressureError() {
         return Flux.interval(Duration.ofMillis(1))
                 .onBackpressureError()
-                .map(i -> "Error策略处理数据: " + i)
+                .map(i -> {
+                    try {
+                        Thread.sleep(100);
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
+                    return "Error策略处理数据: " + i;
+                })
                 .onErrorResume(throwable -> {
                     logger.severe("背压错误: " + throwable.getMessage());
                     return Flux.just("背压错误发生，流已终止");
