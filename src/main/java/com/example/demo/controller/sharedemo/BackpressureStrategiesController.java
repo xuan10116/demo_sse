@@ -109,42 +109,19 @@ public class BackpressureStrategiesController {
     }
 
     /**
-     * 示例6: 自定义背压处理 - 结合多种策略
-     * 演示如何组合使用不同的背压策略
-     */
-    @GetMapping(value = "/custom", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Flux<String> customBackpressureHandling() {
-        AtomicInteger processed = new AtomicInteger(0);
-        AtomicInteger dropped = new AtomicInteger(0);
-
-        return Flux.interval(Duration.ofMillis(5))
-                // 使用缓冲策略，最多缓冲50个元素
-                .onBackpressureBuffer(50, 
-                    item -> {
-                        dropped.incrementAndGet();
-                        logger.info("自定义处理 - 丢弃的项目: " + item);
-                    })
-                .take(200)
-                .map(i -> {
-                    int p = processed.incrementAndGet();
-                    int d = dropped.get();
-                    return String.format("自定义策略 - 处理: %d, 丢弃: %d, 当前数据: %d", p, d, i);
-                });
-    }
-
-    /**
-     * 示例7: 使用sample操作符处理背压
-     * 以指定的时间间隔采样数据流
+     * 示例6: 使用sample操作符处理背压
+     * 以指定的时间间隔采样数据流（当前时间间隔内最新的一条数据）
      */
     @GetMapping(value = "/sample", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<String> sampleBackpressure() {
         return Flux.interval(Duration.ofMillis(1))
                 .sample(Duration.ofMillis(100)) // 每100ms采样一次
+                .take(100)
                 .map(i -> "采样策略处理数据: " + i);
     }
 
     /**
-     * 示例8: 使用window和buffer操作符处理背压
+     * 示例7: 使用window和buffer操作符处理背压
      * 将数据流分组处理
      */
     @GetMapping(value = "/window-buffer", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
