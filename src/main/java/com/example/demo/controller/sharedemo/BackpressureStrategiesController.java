@@ -5,8 +5,11 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import java.time.Duration;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.logging.Logger;
 
 @RestController
@@ -17,7 +20,7 @@ public class BackpressureStrategiesController {
 
     /**
      * 示例1: 使用onBackpressureBuffer策略
-     * 缓冲所有多余的元素直到达到指定的限制
+     * 缓冲所有多余的元素直到达到指定的限制，超出限制时 触发 onError信号
      */
     @GetMapping(value = "/buffer", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<String> backpressureBuffer() {
@@ -32,7 +35,12 @@ public class BackpressureStrategiesController {
 						throw new RuntimeException(e);
 					}
 					return "Buffer策略处理数据: " + i;
-                });
+                })
+//                .onErrorResume(throwable -> {
+//                    logger.severe("背压错误: " + throwable.getMessage());
+//                    return Flux.just("背压错误发生，流已终止");
+//                })
+                ;
     }
 
     /**
@@ -96,15 +104,24 @@ public class BackpressureStrategiesController {
     }
 
     /**
-     * 示例5: 使用limitRate限制请求速率
-     * 控制上游发布者的请求速率
+     * 示例5: 使用limitRate控制上游发布者的请求速率
+     * ：limitRate(n) 是限制每次实际从 “上游” 获取的批次大小（即每次最多取 n 个元素），从而分批处理数据。
      */
     @GetMapping(value = "/limit-rate", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<String> limitRate() {
-        return Flux.interval(Duration.ofMillis(1))
-                .limitRate(10) // 限制请求速率
-                .take(100)
-                .map(i -> "限速策略处理数据: " + i);
+        return Flux.interval(Duration.ofMillis(1)) // 每1毫秒生成一个元素
+                .log() // 记录流的详细事件
+                .take(100) // 取100个元素
+                .limitRate(10) // 限制每次请求最多10个元素
+                .flatMap(i -> Mono.just(i)
+                        .delayElement(Duration.ofMillis(50)) // 模拟下游处理延迟
+                        .map(j -> {
+                            // 记录处理时间戳
+                            return String.format("ID: %3d | 时间: %s | 限速策略处理数据: %d",
+                                    j,
+                                    LocalTime.now().format(DateTimeFormatter.ISO_TIME),
+                                    j);
+                        }));
     }
 
     /**
