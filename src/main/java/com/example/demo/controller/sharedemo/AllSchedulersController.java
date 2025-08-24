@@ -94,48 +94,6 @@ public class AllSchedulersController {
     }
 
     /**
-     * 示例5: Schedulers.fromExecutorService() - 使用自定义线程池
-     * 适用于需要完全控制线程池的场景
-     */
-    @GetMapping(value = "/custom", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Flux<String> customScheduler() {
-        return Flux.range(1, 5)
-                .publishOn(Schedulers.newSingle("自定义单线程"))
-                .map(i -> {
-                    String threadName = Thread.currentThread().getName();
-                    return "自定义调度器 - 数据 " + i + " 在线程 " + threadName;
-                })
-                .delayElements(Duration.ofSeconds(1));
-    }
-
-    /**
-     * 示例6: 调度器对比 - 展示不同调度器的线程使用情况
-     */
-    @GetMapping(value = "/comparison", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Flux<String> schedulerComparison() {
-        return Flux.range(1, 4)
-                .flatMap(i -> {
-                    switch (i) {
-                        case 1:
-                            return Mono.fromCallable(() -> getCurrentThreadInfo("immediate"))
-                                    .subscribeOn(Schedulers.immediate());
-                        case 2:
-                            return Mono.fromCallable(() -> getCurrentThreadInfo("single"))
-                                    .subscribeOn(Schedulers.single());
-                        case 3:
-                            return Mono.fromCallable(() -> getCurrentThreadInfo("boundedElastic"))
-                                    .subscribeOn(Schedulers.boundedElastic());
-                        case 4:
-                            return Mono.fromCallable(() -> getCurrentThreadInfo("parallel"))
-                                    .subscribeOn(Schedulers.parallel());
-                        default:
-                            return Mono.empty();
-                    }
-                })
-                .delayElements(Duration.ofSeconds(1));
-    }
-
-    /**
      * 模拟阻塞操作
      */
     private void simulateBlockingOperation() {

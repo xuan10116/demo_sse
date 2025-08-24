@@ -1,4 +1,4 @@
-package com.example.demo.controller.lingmacode;
+package com.example.demo.controller.sharedemo;
 
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -37,13 +37,11 @@ public class SchedulerExamplesController {
         return Flux.range(1, 5)
                 .map(i -> {
                     String threadName = Thread.currentThread().getName();
-                    System.out.println("数据生成在: " + threadName);
                     return "数据 " + i + " 生成于 " + threadName;
                 })
                 .subscribeOn(Schedulers.newParallel("自定义并行调度器"))
                 .map(data -> {
                     String threadName = Thread.currentThread().getName();
-                    System.out.println("数据处理在: " + threadName);
                     return data + "，处理于 " + threadName;
                 })
                 .delayElements(Duration.ofSeconds(1));

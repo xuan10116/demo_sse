@@ -1,4 +1,4 @@
-package com.example.demo.controller.lingmacode;
+package com.example.demo.controller.otherdemo;
 
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -35,7 +35,8 @@ public class WebClientBackpressureController {
                 .retrieve()
                 .bodyToFlux(String.class)
                 .limitRate(5) // 限制从远程服务接收数据的速率，实现背压控制
-                .onBackpressureBuffer(10, BufferOverflowStrategy.ERROR) // 添加背压缓冲策略
+                .log()
+                .onBackpressureBuffer(300, BufferOverflowStrategy.ERROR) // 添加背压缓冲策略
                 .map(data -> {
                     // 模拟处理数据需要时间
                     try {
@@ -58,8 +59,9 @@ public class WebClientBackpressureController {
      */
     @GetMapping(value = "/publisher", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<String> fastDataStream() {
-        return Flux.interval(Duration.ofMillis(5)) // 每10毫秒产生一个数据项
-                .take(200) // 总共产生1000个数据项
-                .map(i -> "快速数据流项目 #" + i);
+        return Flux.interval(Duration.ofMillis(5))
+                .take(200)
+                .map(i -> "来活了 #" + i)
+                .log();
     }
 }
